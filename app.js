@@ -1,5 +1,5 @@
 const API = 'https://inventory-backend-xf3b.onrender.com/api';
-let token = null, user = null;
+let token = null, user = null, cart = [];
 
 // ── Helpers ───────────────────────────────────────────────────────
 async function api(path, opts = {}) {
@@ -35,6 +35,14 @@ function showApp() {
   $('user-info').querySelector('.user-avatar').textContent = (user.name || 'U')[0].toUpperCase();
   $('user-info').querySelector('.user-name').textContent = user.name;
   $('user-info').querySelector('.user-role').textContent = user.role;
+  $('cart-btn').classList.toggle('hidden', user.role !== 'viewer');
+  
+  // Hide specific nav items based on role
+  $('nav-suppliers').style.display = user.role === 'viewer' ? 'none' : 'flex';
+  $('nav-alerts').style.display = user.role === 'viewer' ? 'none' : 'flex';
+  $('nav-reports').style.display = user.role === 'viewer' ? 'none' : 'flex';
+  $('nav-dsa').style.display = user.role === 'viewer' ? 'none' : 'flex';
+
   checkServer(); navigate('dashboard');
 }
 
@@ -57,7 +65,30 @@ async function loadDashboard() {
   try {
     const [dash, prods] = await Promise.all([api('/reports/dashboard'), api('/products?limit=5')]);
     const s = dash.data || {};
+    
+    // Fetch pending approvals for Admin
+    let pendingHTML = '';
+    if (user.role === 'admin') {
+      const pendingRes = await api('/transactions?status=pending');
+      const pending = pendingRes.data?.rows || pendingRes.data || [];
+      if (pending.length > 0) {
+        pendingHTML = `
+          <div class="card" style="border: 2px solid #f59e0b; margin-bottom: 20px;">
+            <div class="card-header"><h3 style="color: #f59e0b">⚠️ Pending Approvals</h3></div>
+            <div class="table-wrap"><table><thead><tr><th>Ref</th><th>Customer</th><th>Amount</th><th>Actions</th></tr></thead><tbody>
+            ${pending.map(t => `<tr><td><code>${t.transaction_ref}</code></td><td>${t.cashier?.name || 'Unknown'}</td><td>${fmt(t.total_amount)}</td>
+              <td>
+                <button class="btn btn-primary btn-sm" onclick="approveOrder('${t.id}')">Approve</button>
+                <button class="btn btn-danger btn-sm" onclick="rejectOrder('${t.id}')">Reject</button>
+              </td></tr>`).join('')}
+            </tbody></table></div>
+          </div>
+        `;
+      }
+    }
+
     $('page-content').innerHTML = `
+      ${pendingHTML}
       <div class="stats-grid">
         <div class="stat-card blue"><div class="stat-label">Total Products</div><div class="stat-value">${s.totalProducts || 0}</div><div class="stat-sub">Active items in inventory</div></div>
         <div class="stat-card green"><div class="stat-label">Total Revenue</div><div class="stat-value">${fmt(s.totalRevenue)}</div><div class="stat-sub">${s.totalTransactions || 0} transactions</div></div>
@@ -72,11 +103,22 @@ async function loadDashboard() {
         </div>
         <div class="card"><div class="card-header"><h3>System Info</h3></div>
           <div class="dsa-detail" style="line-height:2">
-            <center><h1>Welcome to Inventory</h1></center>
+            <center><h1>Welcome to RetailOS</h1></center>
           </div>
         </div>
       </div>`;
   } catch (e) { $('page-content').innerHTML = `<div class="empty-state"><p>Failed to load dashboard: ${e.message}</p></div>`; }
+}
+
+async function approveOrder(id) {
+  if (!confirm("Approve this purchase order?")) return;
+  await api(`/transactions/${id}/approve`, { method: 'PUT' });
+  toast('Order Approved!', 'success'); loadDashboard();
+}
+async function rejectOrder(id) {
+  if (!confirm("Reject this purchase order?")) return;
+  await api(`/transactions/${id}/reject`, { method: 'PUT' });
+  toast('Order Rejected', 'success'); loadDashboard();
 }
 
 // ── Products ──────────────────────────────────────────────────────
@@ -84,12 +126,13 @@ async function loadProducts() {
   try {
     const d = await api('/products?limit=50');
     const rows = d.data?.rows || d.data || [];
+    const isAdmin = user.role === 'admin';
     $('page-content').innerHTML = `
       <div class="toolbar">
         <input type="text" id="prod-search" placeholder="Search products..." style="max-width:300px">
-        <button class="btn btn-primary" onclick="showAddProduct()">+ Add Product</button>
+        ${isAdmin ? `<button class="btn btn-primary" onclick="showAddProduct()">+ Add Product</button>` : ''}
       </div>
-      <div class="card"><div class="table-wrap"><table><thead><tr><th>Name</th><th>SKU</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Reorder</th><th>Actions</th></tr></thead>
+      <div class="card"><div class="table-wrap"><table><thead><tr><th>Name</th><th>SKU</th><th>Category</th>${isAdmin ? '<th>Cost</th>' : ''}<th>Price</th><th>Stock</th>${isAdmin ? '<th>Reorder</th>' : ''}<th>Actions</th></tr></thead>
       <tbody id="prod-tbody">${renderProdRows(rows)}</tbody></table></div></div>`;
     $('prod-search').oninput = async e => {
       const q = e.target.value;
@@ -100,14 +143,49 @@ async function loadProducts() {
 }
 function renderProdRows(rows) {
   if (!rows.length) return '<tr><td colspan="8" class="empty-state">No products found</td></tr>';
+  const isAdmin = user.role === 'admin';
   return rows.map(p => `<tr>
     <td><strong>${p.name}</strong></td><td><code>${p.sku}</code></td><td>${p.category?.name || '—'}</td>
-    <td>${fmt(p.cost_price)}</td><td>${fmt(p.selling_price)}</td>
+    ${isAdmin ? `<td>${fmt(p.cost_price)}</td>` : ''}<td>${fmt(p.selling_price)}</td>
     <td><span class="pill ${p.qty_in_stock <= (p.reorder_level || 10) ? 'pill-danger' : p.qty_in_stock <= (p.reorder_level || 10) * 2 ? 'pill-warning' : 'pill-success'}">${p.qty_in_stock}</span></td>
-    <td>${p.reorder_level || '—'}</td>
-    <td><button class="btn btn-ghost btn-sm" onclick="editProduct('${p.id}')">Edit</button> <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}','${p.name}')">Del</button></td>
+    ${isAdmin ? `<td>${p.reorder_level || '—'}</td>` : ''}
+    <td>
+      ${user.role === 'viewer' ? `<button class="btn btn-primary btn-sm" onclick="addToCart('${p.id}', '${p.name}', ${p.selling_price})">Add to Cart</button>` : ''}
+      ${isAdmin ? `<button class="btn btn-ghost btn-sm" onclick="editProduct('${p.id}')">Edit</button> <button class="btn btn-danger btn-sm" onclick="deleteProduct('${p.id}','${p.name}')">Del</button>` : ''}
+    </td>
   </tr>`).join('');
 }
+
+// ── Cart ──────────────────────────────────────────────────────────
+function addToCart(id, name, price) {
+  const ex = cart.find(i => i.id === id);
+  if (ex) ex.qty++; else cart.push({ id, name, price, qty: 1 });
+  updateCartBadge();
+  toast('Added to Cart', 'success');
+}
+function updateCartBadge() {
+  const b = $('cart-badge');
+  b.textContent = cart.reduce((a, c) => a + c.qty, 0);
+  if (cart.length > 0) b.classList.remove('hidden');
+}
+window.showCart = function() {
+  if (!cart.length) return toast('Cart is empty', 'warning');
+  const subtotal = cart.reduce((a, c) => a + (c.qty * c.price), 0);
+  showModal('Your Cart', `
+    <div class="table-wrap"><table>
+      <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+      <tbody>
+        ${cart.map((c, i) => `<tr><td>${c.name}</td><td>${c.qty}</td><td>${fmt(c.price)}</td><td>${fmt(c.qty*c.price)}</td></tr>`).join('')}
+      </tbody>
+    </table></div>
+    <div style="text-align:right; font-size:18px; font-weight:bold; margin-top:15px">Subtotal: ${fmt(subtotal)}</div>
+  `, async () => {
+    const items = cart.map(c => ({ product_id: c.id, quantity: c.qty }));
+    await api('/transactions', { method: 'POST', body: JSON.stringify({ items, status: 'pending' }) });
+    toast('Purchase Request Sent to Admin!', 'success');
+    cart = []; updateCartBadge(); closeModal();
+  });
+};
 function showAddProduct() {
   showModal('Add Product', `
     <div class="form-group"><label>Name</label><input id="p-name" required></div>
@@ -142,9 +220,9 @@ async function loadTransactions() {
     const d = await api('/transactions?limit=30');
     const rows = d.data?.rows || d.data || [];
     $('page-content').innerHTML = `
-      <div class="toolbar"><button class="btn btn-primary" onclick="showNewSale()">+ New Sale</button></div>
+      <div class="toolbar">${user.role !== 'viewer' ? `<button class="btn btn-primary" onclick="showNewSale()">+ Direct Sale (POS)</button>` : ''}</div>
       <div class="card"><div class="table-wrap"><table><thead><tr><th>Ref</th><th>Amount</th><th>Payment</th><th>Status</th><th>Date</th></tr></thead><tbody>
-      ${rows.length ? rows.map(t => `<tr><td><code>${t.transaction_ref}</code></td><td>${fmt(t.total_amount)}</td><td><span class="pill pill-info">${t.payment_method}</span></td><td><span class="pill ${t.status === 'completed' ? 'pill-success' : 'pill-warning'}">${t.status}</span></td><td>${new Date(t.createdAt || t.created_at).toLocaleDateString()}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-state">No transactions</td></tr>'}
+      ${rows.length ? rows.map(t => `<tr><td><code>${t.transaction_ref}</code></td><td>${fmt(t.total_amount)}</td><td><span class="pill pill-info">${t.payment_method}</span></td><td><span class="pill ${t.status === 'completed' ? 'pill-success' : t.status === 'pending' ? 'pill-warning' : 'pill-danger'}">${t.status}</span></td><td>${new Date(t.createdAt || t.created_at).toLocaleDateString()}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-state">No transactions</td></tr>'}
       </tbody></table></div></div>`;
   } catch (e) { $('page-content').innerHTML = `<div class="empty-state">${e.message}</div>`; }
 }

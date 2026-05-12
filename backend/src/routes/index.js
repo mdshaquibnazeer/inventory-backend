@@ -30,7 +30,9 @@ router.post('/products/undo',         authenticate, authorize('admin','staff'), 
 // ─── TRANSACTIONS ──────────────────────────────────────────────────────────
 router.get('/transactions',           authenticate, txnCtrl.getTransactions);
 router.get('/transactions/:id',       authenticate, txnCtrl.getTransactionById);
-router.post('/transactions',          authenticate, authorize('admin','staff'), txnCtrl.createTransaction);
+router.post('/transactions',          authenticate, txnCtrl.createTransaction);
+router.put('/transactions/:id/approve', authenticate, authorize('admin','staff'), txnCtrl.approveTransaction);
+router.put('/transactions/:id/reject',  authenticate, authorize('admin','staff'), txnCtrl.rejectTransaction);
 router.patch('/transactions/:id/void', authenticate, authorize('admin'), txnCtrl.voidTransaction);
 
 // ─── ALERTS ────────────────────────────────────────────────────────────────

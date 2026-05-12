@@ -67,6 +67,9 @@ const createTransaction = async (req, res) => {
     const taxAmount = subtotal * 0.0; // Tax can be per-item if needed
     const totalAmount = subtotal - parseFloat(discount_amount) + taxAmount;
 
+    const isPending = req.user.role === 'viewer' || req.body.status === 'pending';
+    const finalStatus = isPending ? 'pending' : 'completed';
+
     // Create transaction record
     const transaction = await Transaction.create({
       id: uuidv4(),
@@ -79,26 +82,28 @@ const createTransaction = async (req, res) => {
       payment_method,
       customer_name,
       customer_phone,
-      status: 'completed',
+      status: finalStatus,
       notes,
     }, { transaction: t });
 
-    // Create line items and decrement stock
+    // Create line items and decrement stock ONLY if completed
     for (const { product, transactionItem } of itemDetails) {
       await TransactionItem.create(
         { ...transactionItem, transaction_id: transaction.id },
         { transaction: t }
       );
 
-      const newQty = product.qty_in_stock - transactionItem.quantity;
-      await product.update({ qty_in_stock: newQty }, { transaction: t });
+      if (finalStatus === 'completed') {
+        const newQty = product.qty_in_stock - transactionItem.quantity;
+        await product.update({ qty_in_stock: newQty }, { transaction: t });
 
-      // Update HashMap cache
-      const cached = productHashMap.get(product.id);
-      if (cached) {
-        cached.qty_in_stock = newQty;
-        productHashMap.set(product.id, cached);
-        productHashMap.set(product.sku, cached);
+        // Update HashMap cache
+        const cached = productHashMap.get(product.id);
+        if (cached) {
+          cached.qty_in_stock = newQty;
+          productHashMap.set(product.id, cached);
+          productHashMap.set(product.sku, cached);
+        }
       }
     }
 
@@ -117,10 +122,12 @@ const createTransaction = async (req, res) => {
     // Prepend to Doubly Linked List (O(1))
     transactionList.prepend(txnData);
 
-    // Check alerts after stock decrement
-    for (const { product } of itemDetails) {
-      const refreshed = await Product.findByPk(product.id);
-      await checkAndCreateAlert(refreshed);
+    // Check alerts after stock decrement ONLY if completed
+    if (finalStatus === 'completed') {
+      for (const { product } of itemDetails) {
+        const refreshed = await Product.findByPk(product.id);
+        await checkAndCreateAlert(refreshed);
+      }
     }
 
     logger.info(`Transaction ${transaction.transaction_ref} completed. Total: ₹${totalAmount}`);
@@ -236,4 +243,71 @@ const voidTransaction = async (req, res) => {
   }
 };
 
-module.exports = { createTransaction, getTransactions, getTransactionById, voidTransaction };
+/**
+ * PUT /api/transactions/:id/approve
+ * Approve pending request, deduct stock, finalize.
+ */
+const approveTransaction = async (req, res) => {
+  const t = await db.transaction();
+  try {
+    const txn = await Transaction.findByPk(req.params.id, {
+      include: [{ model: TransactionItem, as: 'items' }],
+      transaction: t,
+    });
+
+    if (!txn) { await t.rollback(); return res.status(404).json({ success: false, message: 'Transaction not found' }); }
+    if (txn.status !== 'pending') { await t.rollback(); return res.status(400).json({ success: false, message: 'Transaction is not pending' }); }
+
+    // Validate stock and deduct
+    for (const item of txn.items) {
+      const product = await Product.findByPk(item.product_id, { lock: t.LOCK.UPDATE, transaction: t });
+      if (product.qty_in_stock < item.quantity) {
+        await t.rollback();
+        return res.status(400).json({ success: false, message: `Insufficient stock for "${product.name}". Available: ${product.qty_in_stock}` });
+      }
+
+      const newQty = product.qty_in_stock - item.quantity;
+      await product.update({ qty_in_stock: newQty }, { transaction: t });
+
+      const cached = productHashMap.get(product.id);
+      if (cached) {
+        cached.qty_in_stock = newQty;
+        productHashMap.set(product.id, cached);
+      }
+    }
+
+    await txn.update({ status: 'completed' }, { transaction: t });
+    await t.commit();
+
+    // Check alerts
+    for (const item of txn.items) {
+      const refreshed = await Product.findByPk(item.product_id);
+      await checkAndCreateAlert(refreshed);
+    }
+
+    const fullTxn = await Transaction.findByPk(txn.id, { include: [{ model: TransactionItem, as: 'items' }, { model: User, as: 'cashier', attributes: ['name', 'email'] }] });
+    res.json({ success: true, message: 'Transaction approved', data: fullTxn });
+  } catch (error) {
+    await t.rollback();
+    res.status(500).json({ success: false, message: 'Approve failed' });
+  }
+};
+
+/**
+ * PUT /api/transactions/:id/reject
+ * Reject pending request.
+ */
+const rejectTransaction = async (req, res) => {
+  try {
+    const txn = await Transaction.findByPk(req.params.id);
+    if (!txn) return res.status(404).json({ success: false, message: 'Transaction not found' });
+    if (txn.status !== 'pending') return res.status(400).json({ success: false, message: 'Transaction is not pending' });
+
+    await txn.update({ status: 'voided' });
+    res.json({ success: true, message: 'Transaction rejected' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Reject failed' });
+  }
+};
+
+module.exports = { createTransaction, getTransactions, getTransactionById, voidTransaction, approveTransaction, rejectTransaction };
