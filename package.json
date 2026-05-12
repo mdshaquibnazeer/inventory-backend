@@ -1,0 +1,11 @@
+{
+  "name": "inventory-system",
+  "version": "1.0.0",
+  "description": "RetailOS — Inventory Management System",
+  "private": true,
+  "scripts": {
+    "setup": "docker-compose up -d db redis && cd backend && npm install && node src/utils/seed.js",
+    "dev": "node start.js",
+    "stop": "docker-compose down"
+  }
+}
