@@ -10,38 +10,144 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Login Screen -->
+  <!-- Auth Screen -->
   <div id="login-screen" class="screen active">
-    <div class="login-container">
-      <div class="login-brand">
-        <div class="logo-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-            <line x1="12" y1="22.08" x2="12" y2="12"/>
-          </svg>
+    <!-- Animated Background Particles -->
+    <div class="auth-particles" id="auth-particles"></div>
+
+    <div class="auth-container">
+      <!-- Left Panel: Branding -->
+      <div class="auth-branding">
+        <div class="auth-branding-content">
+          <div class="auth-logo">
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+          </div>
+          <h1 class="auth-title">RetailOS</h1>
+          <p class="auth-tagline">Inventory Management System</p>
+          <div class="auth-features">
+            <div class="auth-feature">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span>Secure & Encrypted</span>
+            </div>
+            <div class="auth-feature">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              <span>Real-time Analytics</span>
+            </div>
+            <div class="auth-feature">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span>Team Collaboration</span>
+            </div>
+          </div>
         </div>
-        <h1>RetailOS</h1>
-        <p class="login-subtitle">Inventory Management System</p>
       </div>
-      <form id="login-form" class="login-form">
-        <div class="form-group">
-          <label for="login-email">Email</label>
-          <input type="email" id="login-email" value="admin@inventory.com" required>
+
+      <!-- Right Panel: Forms -->
+      <div class="auth-forms-panel">
+        <!-- Sign In Form -->
+        <div id="signin-panel" class="auth-form-wrapper active">
+          <div class="auth-form-header">
+            <h2>Welcome back</h2>
+            <p>Sign in to your account to continue</p>
+          </div>
+          <form id="login-form" class="auth-form">
+            <div class="form-group">
+              <label for="login-email">Email Address</label>
+              <div class="input-icon-wrapper">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <input type="email" id="login-email" placeholder="you@example.com" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="login-password">Password</label>
+              <div class="input-icon-wrapper">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="login-password" placeholder="Enter your password" required>
+                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password', this)" aria-label="Toggle password visibility">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <button type="submit" id="login-btn" class="btn btn-primary btn-full btn-glow">
+              <span>Sign In</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+            </button>
+            <div id="login-error" class="error-msg hidden"></div>
+          </form>
+          <div class="auth-switch">
+            <span>Don't have an account?</span>
+            <button type="button" class="auth-switch-btn" onclick="switchToSignup()">Create Account</button>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" value="Admin@123" required>
+
+        <!-- Sign Up Form -->
+        <div id="signup-panel" class="auth-form-wrapper">
+          <div class="auth-form-header">
+            <h2>Create Account</h2>
+            <p>Join RetailOS to manage your inventory</p>
+          </div>
+          <form id="signup-form" class="auth-form">
+            <div class="form-group">
+              <label for="signup-name">Full Name</label>
+              <div class="input-icon-wrapper">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <input type="text" id="signup-name" placeholder="John Doe" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="signup-email">Email Address</label>
+              <div class="input-icon-wrapper">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <input type="email" id="signup-email" placeholder="you@example.com" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="signup-password">Password</label>
+              <div class="input-icon-wrapper">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="signup-password" placeholder="Min. 8 characters" required oninput="updatePasswordStrength(this.value)">
+                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('signup-password', this)" aria-label="Toggle password visibility">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+              <!-- Password Strength Indicator -->
+              <div class="password-strength" id="password-strength">
+                <div class="strength-bars">
+                  <div class="strength-bar" id="str-bar-1"></div>
+                  <div class="strength-bar" id="str-bar-2"></div>
+                  <div class="strength-bar" id="str-bar-3"></div>
+                  <div class="strength-bar" id="str-bar-4"></div>
+                </div>
+                <span class="strength-text" id="strength-text"></span>
+              </div>
+              <div class="password-requirements" id="password-requirements">
+                <div class="req" id="req-length"><span class="req-icon">○</span> At least 8 characters</div>
+                <div class="req" id="req-upper"><span class="req-icon">○</span> One uppercase letter</div>
+                <div class="req" id="req-lower"><span class="req-icon">○</span> One lowercase letter</div>
+                <div class="req" id="req-number"><span class="req-icon">○</span> One number</div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="signup-confirm">Confirm Password</label>
+              <div class="input-icon-wrapper">
+                <svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                <input type="password" id="signup-confirm" placeholder="Repeat your password" required>
+              </div>
+            </div>
+            <button type="submit" id="signup-btn" class="btn btn-primary btn-full btn-glow">
+              <span>Create Account</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+            </button>
+            <div id="signup-error" class="error-msg hidden"></div>
+          </form>
+          <div class="auth-switch">
+            <span>Already have an account?</span>
+            <button type="button" class="auth-switch-btn" onclick="switchToSignin()">Sign In</button>
+          </div>
         </div>
-        <button type="submit" id="login-btn" class="btn btn-primary btn-full">
-          <span>Sign In</span>
-        </button>
-        <div id="login-error" class="error-msg hidden"></div>
-      </form>
-      <div class="login-credentials">
-        <p>Demo Credentials</p>
-        <small>Admin: admin@inventory.com / Admin@123</small>
-        <small>Staff: staff@inventory.com / Staff@123</small>
       </div>
     </div>
   </div>

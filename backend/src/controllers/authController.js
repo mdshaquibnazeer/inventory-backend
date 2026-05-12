@@ -88,16 +88,39 @@ const login = async (req, res) => {
  */
 const register = async (req, res) => {
   try {
-    const { name, email, password, role = 'staff' } = req.body;
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ success: false, message: 'Name, email, and password required' });
+    }
+
+    // Password strength validation
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters long' });
+    }
+    if (!/[A-Z]/.test(password)) {
+      return res.status(400).json({ success: false, message: 'Password must contain at least one uppercase letter' });
+    }
+    if (!/[a-z]/.test(password)) {
+      return res.status(400).json({ success: false, message: 'Password must contain at least one lowercase letter' });
+    }
+    if (!/[0-9]/.test(password)) {
+      return res.status(400).json({ success: false, message: 'Password must contain at least one number' });
+    }
+
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid email address' });
     }
 
     const existing = await User.findOne({ where: { email: email.toLowerCase() } });
     if (existing) {
       return res.status(409).json({ success: false, message: 'Email already registered' });
     }
+
+    // Force 'viewer' role for public self-registration (security)
+    const role = 'viewer';
 
     const rounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
     const password_hash = await bcrypt.hash(password, rounds);
@@ -106,12 +129,20 @@ const register = async (req, res) => {
       id: uuidv4(), name, email: email.toLowerCase(), password_hash, role,
     });
 
+    // Generate tokens so user is logged in immediately after registration
+    const { accessToken, refreshToken } = generateTokens(user);
+    await user.update({ refresh_token: refreshToken, last_login: new Date() });
+
     logger.info(`New user registered: ${email} (${role})`);
 
     res.status(201).json({
       success: true,
-      message: 'User created successfully',
-      data: { id: user.id, name: user.name, email: user.email, role: user.role },
+      message: 'Account created successfully',
+      data: {
+        accessToken,
+        refreshToken,
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
+      },
     });
   } catch (error) {
     logger.error('Register error:', error);

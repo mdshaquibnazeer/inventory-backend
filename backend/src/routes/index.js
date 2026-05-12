@@ -12,7 +12,7 @@ const misc = require('../controllers/miscControllers');
 // ─── AUTH ──────────────────────────────────────────────────────────────────
 router.post('/auth/login',   authCtrl.login);
 router.post('/auth/refresh', authCtrl.refreshToken);
-router.post('/auth/register', authenticate, authorize('admin'), authCtrl.register);
+router.post('/auth/register', authCtrl.register);
 router.post('/auth/logout',   authenticate, authCtrl.logout);
 router.get('/auth/me',        authenticate, authCtrl.getMe);
 

@@ -17,18 +17,154 @@ function toast(msg, type = 'info') {
 function fmt(n) { return Number(n || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' }); }
 
 // ── Auth ──────────────────────────────────────────────────────────
+
+// Create floating particles for auth background
+function initParticles() {
+  const container = $('auth-particles');
+  if (!container) return;
+  const colors = ['rgba(99,102,241,.3)', 'rgba(167,139,250,.25)', 'rgba(34,197,94,.2)', 'rgba(59,130,246,.2)'];
+  for (let i = 0; i < 20; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random() * 6 + 2;
+    p.style.cssText = `
+      width: ${size}px; height: ${size}px;
+      left: ${Math.random() * 100}%;
+      background: ${colors[Math.floor(Math.random() * colors.length)]};
+      animation-duration: ${Math.random() * 15 + 10}s;
+      animation-delay: ${Math.random() * 10}s;
+    `;
+    container.appendChild(p);
+  }
+}
+initParticles();
+
+// Toggle password visibility
+function togglePasswordVisibility(inputId, btn) {
+  const input = $(inputId);
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+  btn.innerHTML = isPassword
+    ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+    : '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+}
+
+// Password strength checker
+function updatePasswordStrength(password) {
+  let score = 0;
+  const checks = {
+    length: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+  };
+
+  // Update requirement indicators
+  Object.keys(checks).forEach(key => {
+    const el = $(`req-${key}`);
+    if (el) {
+      el.classList.toggle('met', checks[key]);
+      el.querySelector('.req-icon').textContent = checks[key] ? '●' : '○';
+    }
+    if (checks[key]) score++;
+  });
+
+  // Bonus for special chars and length
+  if (/[^A-Za-z0-9]/.test(password)) score = Math.min(score + 0.5, 4);
+  if (password.length >= 12) score = Math.min(score + 0.5, 4);
+
+  const bars = [1, 2, 3, 4].map(i => $(`str-bar-${i}`));
+  const textEl = $('strength-text');
+  const levels = [
+    { min: 0, cls: '', text: '' },
+    { min: 1, cls: 'weak', text: 'Weak' },
+    { min: 2, cls: 'fair', text: 'Fair' },
+    { min: 3, cls: 'good', text: 'Good' },
+    { min: 4, cls: 'strong', text: 'Strong' },
+  ];
+
+  let level = levels[0];
+  for (const l of levels) {
+    if (score >= l.min) level = l;
+  }
+
+  bars.forEach((bar, i) => {
+    bar.className = 'strength-bar';
+    if (password.length > 0 && i < Math.ceil(score)) bar.classList.add(level.cls);
+  });
+
+  textEl.className = 'strength-text';
+  textEl.textContent = password.length > 0 ? level.text : '';
+  if (level.cls) textEl.classList.add(level.cls);
+}
+
+// Form switching
+function switchToSignup() {
+  $('signin-panel').classList.remove('active');
+  $('signup-panel').classList.add('active');
+  $('login-error').classList.add('hidden');
+}
+
+function switchToSignin() {
+  $('signup-panel').classList.remove('active');
+  $('signin-panel').classList.add('active');
+  $('signup-error').classList.add('hidden');
+}
+
+// Sign In handler
 $('login-form').onsubmit = async e => {
   e.preventDefault();
   const btn = $('login-btn'); btn.disabled = true;
+  $('login-error').classList.add('hidden');
   try {
     const d = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email: $('login-email').value, password: $('login-password').value }) });
     token = d.data.accessToken; user = d.data.user;
     localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(user));
     showApp();
+    toast('Welcome back, ' + user.name + '!', 'success');
   } catch (err) { $('login-error').textContent = err.message; $('login-error').classList.remove('hidden'); }
   btn.disabled = false;
 };
-$('logout-btn').onclick = () => { token = null; user = null; localStorage.clear(); $('app-screen').classList.remove('active'); $('login-screen').classList.add('active'); };
+
+// Sign Up handler
+$('signup-form').onsubmit = async e => {
+  e.preventDefault();
+  const btn = $('signup-btn'); btn.disabled = true;
+  $('signup-error').classList.add('hidden');
+
+  const name = $('signup-name').value.trim();
+  const email = $('signup-email').value.trim();
+  const password = $('signup-password').value;
+  const confirm = $('signup-confirm').value;
+
+  // Client-side validation
+  if (password !== confirm) {
+    $('signup-error').textContent = 'Passwords do not match';
+    $('signup-error').classList.remove('hidden');
+    btn.disabled = false;
+    return;
+  }
+  if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+    $('signup-error').textContent = 'Password does not meet the requirements';
+    $('signup-error').classList.remove('hidden');
+    btn.disabled = false;
+    return;
+  }
+
+  try {
+    const d = await api('/auth/register', { method: 'POST', body: JSON.stringify({ name, email, password }) });
+    token = d.data.accessToken; user = d.data.user;
+    localStorage.setItem('token', token); localStorage.setItem('user', JSON.stringify(user));
+    showApp();
+    toast('Account created! Welcome, ' + user.name + '!', 'success');
+  } catch (err) {
+    $('signup-error').textContent = err.message;
+    $('signup-error').classList.remove('hidden');
+  }
+  btn.disabled = false;
+};
+
+$('logout-btn').onclick = () => { token = null; user = null; localStorage.clear(); $('app-screen').classList.remove('active'); $('login-screen').classList.add('active'); switchToSignin(); };
 
 function showApp() {
   $('login-screen').classList.remove('active'); $('app-screen').classList.add('active');

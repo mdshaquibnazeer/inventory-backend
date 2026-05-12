@@ -46,6 +46,13 @@ app.use('/api/auth/login', rateLimit({
   message: { success: false, message: 'Too many login attempts.' },
 }));
 
+// Rate limit registration to prevent abuse
+app.use('/api/auth/register', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, message: 'Too many registration attempts. Please try again later.' },
+}));
+
 // ─── GENERAL MIDDLEWARE ────────────────────────────────────────────────────
 app.use(compression());
 app.use(express.json({ limit: '10mb' }));
