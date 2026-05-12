@@ -13,6 +13,10 @@ const routes = require('./routes');
 const logger = require('./utils/logger');
 
 const app = express();
+
+// Trust reverse proxy for rate limiting (needed for Render/Heroku)
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 5000;
 
 // Ensure logs dir exists
