@@ -1,4 +1,4 @@
-const API = 'http://localhost:5000/api';
+const API = 'https://inventory-backend-xf3b.onrender.com/api';
 let token = null, user = null;
 
 // ── Helpers ───────────────────────────────────────────────────────
